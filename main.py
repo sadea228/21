@@ -634,8 +634,8 @@ def find_game_by_user_id(user_id: int) -> Optional[Game]:
 async def on_startup(bot: Bot) -> None:
     """Действия при запуске бота"""
     # Устанавливаем вебхук
-    await bot.set_webhook(url=WEBHOOK_URL + WEBHOOK_PATH)
-    logging.info(f"Webhook установлен на {WEBHOOK_URL + WEBHOOK_PATH}")
+    await bot.set_webhook(url=WEBHOOK_URL)
+    logging.info(f"Webhook установлен на {WEBHOOK_URL}")
     
     # Устанавливаем команды бота для отображения в меню
     # Команды для личных сообщений
@@ -708,7 +708,7 @@ def start_webhook():
     
     # Добавляем обработчик корневого маршрута для healthcheck
     async def health_check(request):
-        return web.Response(text=f"Бот работает. Webhook установлен на {WEBHOOK_URL}{WEBHOOK_PATH}")
+        return web.Response(text=f"Бот работает. Webhook установлен на {WEBHOOK_URL}")
     
     app.router.add_get("/", health_check)
     
@@ -716,7 +716,7 @@ def start_webhook():
     logging.info(f"Используется BOT_TOKEN (маскировано): ...{BOT_TOKEN[-5:]}")
     logging.info(f"Webhook URL: {WEBHOOK_URL}")
     logging.info(f"Webhook PATH: {WEBHOOK_PATH}")
-    logging.info(f"Полный путь Webhook: {WEBHOOK_URL}{WEBHOOK_PATH}")
+    logging.info(f"Полный путь Webhook: {WEBHOOK_URL}")
     logging.info(f"Веб-сервер запускается на {WEB_SERVER_HOST}:{WEB_SERVER_PORT}")
     
     # Настройка веб-сервера
