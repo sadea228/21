@@ -815,9 +815,8 @@ async def on_shutdown(bot: Bot) -> None:
     # Удаляем вебхук
     await bot.delete_webhook()
     logging.info("Webhook удален")
-    # Закрываем внутреннюю aiohttp сессию бота
-    session = await bot.get_session()
-    await session.close()
+    # Закрываем внутреннюю aiohttp-сессию бота
+    await bot.session.close()
     logging.info("Aiohttp session закрыта")
 
 # Функция для запуска бота с polling (для локальной разработки)
