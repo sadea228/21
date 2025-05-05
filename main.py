@@ -114,7 +114,7 @@ async def cmd_game_status(message: types.Message):
         # Формируем список присоединившихся игроков
         players_info = ""
         if players_count > 0:
-            players_list = "\n".join([f"👤 *{player.username}*" for player in game.players.values()])
+            players_list = "\n".join([f"👤 `{player.username}`" for player in game.players.values()])
             players_info = f"👥 *Присоединившиеся игроки ({players_count}/2):*\n{players_list}\n"
         
         # Информация о времени ожидания
@@ -132,15 +132,25 @@ async def cmd_game_status(message: types.Message):
             f"🎮 Нажмите кнопку ниже, чтобы присоединиться:"
         )
         
-        await message.answer(status_message, parse_mode="Markdown", reply_markup=get_join_keyboard())
+        try:
+            await message.answer(status_message, parse_mode="Markdown", reply_markup=get_join_keyboard())
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            clean_message = status_message.replace("*", "").replace("`", "").replace("\\_", "_")
+            await message.answer(clean_message, reply_markup=get_join_keyboard())
     else:
         # Если игра уже идет
         if game.finished:
             # Если игра завершена
-            await message.answer(
-                f"📊 *Статус игры:* Завершена\n\n{game.get_status_message()}",
-                parse_mode="Markdown"
-            )
+            try:
+                await message.answer(
+                    f"📊 *Статус игры:* Завершена\n\n{game.get_status_message()}",
+                    parse_mode="Markdown"
+                )
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                status_message = f"📊 Статус игры: Завершена\n\n{game.get_status_message().replace('*', '')}"
+                await message.answer(status_message)
         else:
             # Если игра активна
             current_player = game.players.get(game.current_player_id)
@@ -157,17 +167,22 @@ async def cmd_game_status(message: types.Message):
                 elif player.stopped:
                     status = "✋"  # остановился
                 
-                players_info.append(f"{status} *{player.username}*: {player.get_score()} очков")
+                players_info.append(f"{status} `{player.username}`: {player.get_score()} очков")
             
             players_list = "\n".join(players_info)
             
             status_message = (
                 f"📊 *Статус игры:* Активна\n"
                 f"👥 *Игроки:*\n{players_list}\n\n"
-                f"🎯 *Текущий ход:* {player_name}"
+                f"🎯 *Текущий ход:* `{player_name}`"
             )
             
-            await message.answer(status_message, parse_mode="Markdown")
+            try:
+                await message.answer(status_message, parse_mode="Markdown")
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                clean_message = status_message.replace("*", "").replace("`", "").replace("\\_", "_")
+                await message.answer(clean_message)
 
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
@@ -209,16 +224,24 @@ async def wait_for_second_player(chat_id: int, message_id: int):
             players_count = len(game.players)
             players_info = ""
             if players_count > 0:
-                players_list = "\n".join([f"👤 *{player.username}*" for player in game.players.values()])
+                # Экранируем специальные символы Markdown в именах пользователей
+                players_list = "\n".join([f"👤 `{player.username}`" for player in game.players.values()])
                 players_info = f"\n\n👥 *Присоединившиеся игроки ({players_count}/2):*\n{players_list}"
             
             timeout_message = (
                 f"⏱ *Время ожидания истекло!*\n"
                 f"Для начала игры необходимо минимум 2 игрока.{players_info}\n\n"
-                f"Игра отменена. Начните новую игру командой /start_21"
+                f"Игра отменена. Начните новую игру командой /start\\_21"
             )
             
-            await bot.send_message(chat_id, timeout_message, parse_mode="Markdown")
+            try:
+                await bot.send_message(chat_id, timeout_message, parse_mode="Markdown")
+            except TelegramBadRequest as e:
+                # Если не удалось отправить с Markdown, отправляем без форматирования
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                clean_message = timeout_message.replace("*", "").replace("`", "").replace("\\_", "_")
+                await bot.send_message(chat_id, clean_message)
+            
             del active_games[chat_id]
             
             # Удаляем таймер
@@ -257,11 +280,11 @@ async def process_join_callback(callback: types.CallbackQuery):
     bot_username = (await bot.get_me()).username
     
     # Формируем список присоединившихся игроков
-    players_list = "\n".join([f"👤 *{player.username}*" for player in game.players.values()])
+    players_list = "\n".join([f"👤 `{player.username}`" for player in game.players.values()])
     players_count = len(game.players)
     
     join_message = (
-        f"👤 Игрок *{username}* присоединился к игре!\n\n"
+        f"👤 Игрок `{username}` присоединился к игре!\n\n"
         f"📊 *Статус игры:*\n"
         f"👥 *Игроки ({players_count}/2):*\n{players_list}\n"
     )
@@ -282,7 +305,7 @@ async def process_join_callback(callback: types.CallbackQuery):
         # Если успешно, то пользователь уже взаимодействовал с ботом
     except Exception:
         # Пользователь еще не начал диалог с ботом
-        join_message += f"\n❗️ *{username}*, пожалуйста, начните личный диалог с ботом перед началом игры: https://t.me/{bot_username}"
+        join_message += f"\n❗️ `{username}`, пожалуйста, начните личный диалог с ботом перед началом игры: https://t.me/{bot_username}"
     
     # Пытаемся изменить существующее сообщение или отправляем новое
     try:
@@ -291,8 +314,15 @@ async def process_join_callback(callback: types.CallbackQuery):
             parse_mode="Markdown",
             reply_markup=get_join_keyboard() if players_count < 2 else None
         )
-    except Exception:
-        await bot.send_message(chat_id, join_message, parse_mode="Markdown")
+    except Exception as e:
+        logging.error(f"Ошибка при обновлении сообщения: {e}")
+        try:
+            await bot.send_message(chat_id, join_message, parse_mode="Markdown")
+        except TelegramBadRequest as e:
+            # Если не удалось отправить с Markdown, отправляем без форматирования
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            clean_message = join_message.replace("*", "").replace("`", "").replace("\\_", "_")
+            await bot.send_message(chat_id, clean_message)
     
     # Если набралось 2 игрока, начинаем игру
     if can_start:
@@ -303,11 +333,17 @@ async def process_join_callback(callback: types.CallbackQuery):
             del join_timers[chat_id]
         
         # Объявляем о начале игры
-        players_str = ", ".join(f"*{player.username}*" for player in game.players.values())
+        players_str = ", ".join([f"`{player.username}`" for player in game.players.values()])
         start_message = f"🎲 *Игра начинается!*\n👥 Участники: {players_str}"
         start_message += f"\n\n❗️ Убедитесь, что вы начали личный диалог с ботом: https://t.me/{bot_username}"
         
-        await bot.send_message(chat_id, start_message, parse_mode="Markdown")
+        try:
+            await bot.send_message(chat_id, start_message, parse_mode="Markdown")
+        except TelegramBadRequest as e:
+            # Если не удалось отправить с Markdown, отправляем без форматирования
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            clean_message = start_message.replace("*", "").replace("`", "").replace("\\_", "_")
+            await bot.send_message(chat_id, clean_message)
         
         # Отправляем информацию о картах каждому игроку в личку
         await send_cards_info_to_players(game)
@@ -315,11 +351,18 @@ async def process_join_callback(callback: types.CallbackQuery):
         # Сообщаем о ходе первого игрока
         current_player = game.players.get(game.current_player_id)
         if current_player:
-            await bot.send_message(
-                chat_id, 
-                f"🎯 Ход игрока *{current_player.username}*. Проверьте личные сообщения от бота!",
-                parse_mode="Markdown"
-            )
+            try:
+                await bot.send_message(
+                    chat_id, 
+                    f"🎯 Ход игрока `{current_player.username}`. Проверьте личные сообщения от бота!",
+                    parse_mode="Markdown"
+                )
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                await bot.send_message(
+                    chat_id, 
+                    f"🎯 Ход игрока {current_player.username}. Проверьте личные сообщения от бота!"
+                )
 
 async def send_cards_info_to_players(game: Game):
     """Отправляет информацию о картах игрокам в личные сообщения"""
@@ -385,21 +428,36 @@ async def process_hit_callback(callback: types.CallbackQuery):
     await callback.answer(f"🃏 Вы взяли карту {card}!", show_alert=False)
     
     # Сообщаем в групповой чат о взятии карты
-    await bot.send_message(
-        game.chat_id,
-        f"🃏 Игрок *{player.username}* берет еще карту.",
-        parse_mode="Markdown"
-    )
+    try:
+        await bot.send_message(
+            game.chat_id,
+            f"🃏 Игрок `{player.username}` берет еще карту.",
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+        await bot.send_message(
+            game.chat_id,
+            f"🃏 Игрок {player.username} берет еще карту."
+        )
     
     # Проверяем, может ли бот отправлять сообщения пользователю
     if not await can_message_user(user_id):
         bot_username = (await bot.get_me()).username
-        await bot.send_message(
-            game.chat_id,
-            f"❗️ *{player.username}*, бот не может отправить вам личное сообщение. "
-            f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
-            parse_mode="Markdown"
-        )
+        try:
+            await bot.send_message(
+                game.chat_id,
+                f"❗️ `{player.username}`, бот не может отправить вам личное сообщение. "
+                f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            await bot.send_message(
+                game.chat_id,
+                f"❗️ {player.username}, бот не может отправить вам личное сообщение. "
+                f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}"
+            )
     else:
         # Обновляем информацию о картах
         message = (
@@ -409,11 +467,18 @@ async def process_hit_callback(callback: types.CallbackQuery):
         
         # Проверяем на перебор
         if player.busted:
-            await bot.send_message(
-                game.chat_id,
-                f"💥 Игрок *{player.username}* перебрал! Сумма очков: *{player.get_score()}*",
-                parse_mode="Markdown"
-            )
+            try:
+                await bot.send_message(
+                    game.chat_id,
+                    f"💥 Игрок `{player.username}` перебрал! Сумма очков: *{player.get_score()}*",
+                    parse_mode="Markdown"
+                )
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                await bot.send_message(
+                    game.chat_id,
+                    f"💥 Игрок {player.username} перебрал! Сумма очков: {player.get_score()}"
+                )
             
             # Отправляем игроку в ЛС обновление о переборе и убираем клавиатуру
             try:
@@ -435,28 +500,45 @@ async def process_hit_callback(callback: types.CallbackQuery):
                     f"🔢 *Сумма очков:* {player.get_score()}\n\n"
                     f"Вы взяли слишком много карт и проиграли."
                 )
-                await bot.send_message(user_id, bust_message, parse_mode="Markdown")
+                try:
+                    await bot.send_message(user_id, bust_message, parse_mode="Markdown")
+                except TelegramBadRequest as e:
+                    logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                    clean_message = bust_message.replace("*", "").replace("`", "").replace("\\_", "_")
+                    await bot.send_message(user_id, clean_message)
             except Exception as e:
                 logging.error(f"Ошибка при отправке сообщения о переборе игроку {user_id}: {e}")
             
             # Проверяем, завершилась ли игра
             if game.finished:
-                await bot.send_message(
-                    game.chat_id,
-                    game.get_status_message(),
-                    parse_mode="Markdown"
-                )
+                try:
+                    await bot.send_message(
+                        game.chat_id,
+                        game.get_status_message(),
+                        parse_mode="Markdown"
+                    )
+                except TelegramBadRequest as e:
+                    logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                    clean_message = game.get_status_message().replace("*", "").replace("`", "").replace("\\_", "_")
+                    await bot.send_message(game.chat_id, clean_message)
                 return
             
             # Переход хода
             game.next_turn()
             current_player = game.players.get(game.current_player_id)
             if current_player:
-                await bot.send_message(
-                    game.chat_id,
-                    f"🎯 Ход переходит к игроку *{current_player.username}*.",
-                    parse_mode="Markdown"
-                )
+                try:
+                    await bot.send_message(
+                        game.chat_id,
+                        f"🎯 Ход переходит к игроку `{current_player.username}`.",
+                        parse_mode="Markdown"
+                    )
+                except TelegramBadRequest as e:
+                    logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                    await bot.send_message(
+                        game.chat_id,
+                        f"🎯 Ход переходит к игроку {current_player.username}."
+                    )
                 await update_player_message(game, current_player.user_id)
             return
         
@@ -492,12 +574,20 @@ async def process_hit_callback(callback: types.CallbackQuery):
             except Exception as e:
                 logging.error(f"Ошибка при отправке сообщения игроку {user_id}: {e}")
                 bot_username = (await bot.get_me()).username
-                await bot.send_message(
-                    game.chat_id,
-                    f"❗️ *{player.username}*, бот не может отправить вам личное сообщение. "
-                    f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
-                    parse_mode="Markdown"
-                )
+                try:
+                    await bot.send_message(
+                        game.chat_id,
+                        f"❗️ `{player.username}`, бот не может отправить вам личное сообщение. "
+                        f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
+                        parse_mode="Markdown"
+                    )
+                except TelegramBadRequest as e:
+                    logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                    await bot.send_message(
+                        game.chat_id,
+                        f"❗️ {player.username}, бот не может отправить вам личное сообщение. "
+                        f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}"
+                    )
 
 @dp.callback_query(F.data == "stand")
 async def process_stand_callback(callback: types.CallbackQuery):
@@ -526,11 +616,18 @@ async def process_stand_callback(callback: types.CallbackQuery):
     await callback.answer("✋ Вы остановились!", show_alert=False)
     
     # Сообщаем в групповой чат об остановке
-    await bot.send_message(
-        game.chat_id,
-        f"✋ Игрок *{player.username}* останавливается. Сумма очков: *{player.get_score()}*",
-        parse_mode="Markdown"
-    )
+    try:
+        await bot.send_message(
+            game.chat_id,
+            f"✋ Игрок `{player.username}` останавливается. Сумма очков: *{player.get_score()}*",
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+        await bot.send_message(
+            game.chat_id,
+            f"✋ Игрок {player.username} останавливается. Сумма очков: {player.get_score()}"
+        )
     
     # Убираем клавиатуру после остановки
     try:
@@ -540,22 +637,34 @@ async def process_stand_callback(callback: types.CallbackQuery):
     
     # Проверяем, завершена ли игра
     if game.finished:
-        await bot.send_message(
-            game.chat_id,
-            game.get_status_message(),
-            parse_mode="Markdown"
-        )
+        try:
+            await bot.send_message(
+                game.chat_id,
+                game.get_status_message(),
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            clean_message = game.get_status_message().replace("*", "").replace("`", "").replace("\\_", "_")
+            await bot.send_message(game.chat_id, clean_message)
         return
     
     # Переходим к следующему игроку
     game.next_turn()
     current_player = game.players.get(game.current_player_id)
     if current_player:
-        await bot.send_message(
-            game.chat_id,
-            f"🎯 Ход переходит к игроку *{current_player.username}*.",
-            parse_mode="Markdown"
-        )
+        try:
+            await bot.send_message(
+                game.chat_id,
+                f"🎯 Ход переходит к игроку `{current_player.username}`.",
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            await bot.send_message(
+                game.chat_id,
+                f"🎯 Ход переходит к игроку {current_player.username}."
+            )
         await update_player_message(game, current_player.user_id)
 
 async def can_message_user(user_id: int) -> bool:
@@ -575,13 +684,22 @@ async def update_player_message(game: Game, user_id: int):
     # Проверяем, может ли бот отправлять сообщения пользователю
     if not await can_message_user(user_id):
         bot_username = (await bot.get_me()).username
-        await bot.send_message(
-            game.chat_id,
-            f"❗️ *{player.username}*, бот не может отправить вам личное сообщение. "
-            f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username} "
-            f"и затем нажмите любую кнопку действия.",
-            parse_mode="Markdown"
-        )
+        try:
+            await bot.send_message(
+                game.chat_id,
+                f"❗️ `{player.username}`, бот не может отправить вам личное сообщение. "
+                f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username} "
+                f"и затем нажмите любую кнопку действия.",
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            await bot.send_message(
+                game.chat_id,
+                f"❗️ {player.username}, бот не может отправить вам личное сообщение. "
+                f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username} "
+                f"и затем нажмите любую кнопку действия."
+            )
         return
 
     message = (
@@ -607,22 +725,40 @@ async def update_player_message(game: Game, user_id: int):
                     pass  # Игнорируем ошибки при удалении клавиатуры
             
             # Отправляем новое сообщение и сохраняем его ID
-            sent_message = await bot.send_message(
-                user_id, 
-                message, 
-                reply_markup=keyboard, 
-                parse_mode="Markdown"
-            )
-            last_keyboard_messages[user_id] = sent_message.message_id
+            try:
+                sent_message = await bot.send_message(
+                    user_id, 
+                    message, 
+                    reply_markup=keyboard, 
+                    parse_mode="Markdown"
+                )
+                last_keyboard_messages[user_id] = sent_message.message_id
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                clean_message = message.replace("*", "").replace("`", "").replace("\\_", "_")
+                sent_message = await bot.send_message(
+                    user_id, 
+                    clean_message, 
+                    reply_markup=keyboard
+                )
+                last_keyboard_messages[user_id] = sent_message.message_id
         except Exception as e:
             logging.error(f"Ошибка при отправке сообщения игроку {user_id}: {e}")
             bot_username = (await bot.get_me()).username
-            await bot.send_message(
-                game.chat_id,
-                f"❗️ *{player.username}*, бот не может отправить вам личное сообщение. "
-                f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
-                parse_mode="Markdown"
-            )
+            try:
+                await bot.send_message(
+                    game.chat_id,
+                    f"❗️ `{player.username}`, бот не может отправить вам личное сообщение. "
+                    f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}",
+                    parse_mode="Markdown"
+                )
+            except TelegramBadRequest as e:
+                logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+                await bot.send_message(
+                    game.chat_id,
+                    f"❗️ {player.username}, бот не может отправить вам личное сообщение. "
+                    f"Пожалуйста, начните диалог с ботом: https://t.me/{bot_username}"
+                )
 
 def find_game_by_user_id(user_id: int) -> Optional[Game]:
     """Находит игру, в которой участвует пользователь"""
