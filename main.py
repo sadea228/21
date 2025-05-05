@@ -778,6 +778,12 @@ def find_game_by_user_id(user_id: int) -> Optional[Game]:
             return game
     return None
 
+@dp.message()
+async def unhandled_message_handler(message: types.Message):
+    logging.warning(f"Получено необработанное сообщение: {message.text} от пользователя {message.from_user.id} в чате {message.chat.id}")
+    # Можно добавить ответ пользователю для отладки, но пока ограничимся логом
+    # await message.answer("Получил ваше сообщение, но не нашел обработчик команды.")
+
 async def on_startup(bot: Bot) -> None:
     """Действия при запуске бота"""
     # Устанавливаем вебхук
