@@ -102,7 +102,14 @@ async def cmd_game_status(message: types.Message):
     
     # Проверяем наличие активной игры
     if chat_id not in active_games:
-        await message.answer("ℹ️ В этом чате нет активной игры. Начните новую игру командой /start_21", parse_mode="Markdown")
+        try:
+            await message.answer(
+                "ℹ️ В этом чате нет активной игры. Начните новую игру командой /start\_21",
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+            await message.answer("ℹ️ В этом чате нет активной игры. Начните новую игру командой /start_21")
         return
     
     game = active_games[chat_id]
@@ -202,13 +209,17 @@ async def cmd_help(message: types.Message):
         "5. Когда оба игрока закончили брать карты, сравнивается сумма очков\n"
         "6. Побеждает игрок с наибольшим количеством очков (не более 21)\n\n"
         "*Доступные команды:*\n"
-        "• /start_21 - начать новую игру (только в групповом чате)\n"
-        "• /game_status - проверить текущий статус игры\n"
+        "• /start\_21 - начать новую игру (только в групповом чате)\n"
+        "• /game\_status - проверить текущий статус игры\n"
         "• /help - показать правила и доступные команды\n\n"
         "❗️ *Важно:* Перед началом игры каждый участник должен начать личный диалог с ботом, чтобы получать информацию о своих картах."
     )
-    
-    await message.answer(help_text, parse_mode="Markdown")
+    try:
+        await message.answer(help_text, parse_mode="Markdown")
+    except TelegramBadRequest as e:
+        logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
+        clean_text = help_text.replace("*", "").replace("`", "").replace("\\_", "_")
+        await message.answer(clean_text)
 
 async def wait_for_second_player(chat_id: int, message_id: int):
     """Функция ожидания второго игрока с таймером"""
