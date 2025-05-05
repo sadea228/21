@@ -1,12 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-# Временно жёстко задаём токен для локального тестирования
-BOT_TOKEN = "7825658711:AAGglEpeH55SoLAthkkGUuh0A1AGJH_1R2o"
+# Загружаем переменные окружения из .env файла, если он существует
+load_dotenv()
+
+# Токен бота
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7825658711:AAGglEpeH55SoLAthkkGUuh0A1AGJH_1R2o")
 
 # Конфигурация для webhook (Render)
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://your-app-name.onrender.com")
-WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", f"/webhook/{BOT_TOKEN}")
+WEBHOOK_HOST = os.getenv("WEBHOOK_URL", "https://your-app-name.onrender.com")
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/telegram-webhook/")
 WEBHOOK_URL = WEBHOOK_HOST
 
 # Параметры веб-сервера

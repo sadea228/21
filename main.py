@@ -706,6 +706,19 @@ def start_webhook():
     )
     webhook_requests_handler.register(app, path=WEBHOOK_PATH)
     
+    # Добавляем обработчик корневого маршрута для healthcheck
+    async def health_check(request):
+        return web.Response(text=f"Бот работает. Webhook установлен на {WEBHOOK_URL}{WEBHOOK_PATH}")
+    
+    app.router.add_get("/", health_check)
+    
+    # Диагностическая информация
+    logging.info(f"Используется BOT_TOKEN (маскировано): ...{BOT_TOKEN[-5:]}")
+    logging.info(f"Webhook URL: {WEBHOOK_URL}")
+    logging.info(f"Webhook PATH: {WEBHOOK_PATH}")
+    logging.info(f"Полный путь Webhook: {WEBHOOK_URL}{WEBHOOK_PATH}")
+    logging.info(f"Веб-сервер запускается на {WEB_SERVER_HOST}:{WEB_SERVER_PORT}")
+    
     # Настройка веб-сервера
     setup_application(app, dp, bot=bot)
     
