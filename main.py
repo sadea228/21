@@ -36,7 +36,7 @@ async def errors_handler(exception: Exception):
     """Обработчик ошибок."""
     logging.exception(f"Ошибка при обработке запроса: {exception}")
 
-@dp.message(Command("start"))
+@dp.message(Command("start", ignore_mention=True))
 async def cmd_start(message: types.Message):
     """Обработчик команды /start"""
     await message.answer(
@@ -48,7 +48,7 @@ async def cmd_start(message: types.Message):
         parse_mode="Markdown"
     )
 
-@dp.message(Command("start_21"))
+@dp.message(Command("start_21", ignore_mention=True))
 async def cmd_start_game(message: types.Message):
     """Обработчик команды /start_21 - начало новой игры"""
     # Проверяем, что команда отправлена в групповом чате
@@ -90,7 +90,7 @@ async def cmd_start_game(message: types.Message):
     # Запускаем таймер ожидания второго игрока
     asyncio.create_task(wait_for_second_player(chat_id, message.message_id))
 
-@dp.message(Command("game_status"))
+@dp.message(Command("game_status", ignore_mention=True))
 async def cmd_game_status(message: types.Message):
     """Обработчик команды /game_status - показывает текущий статус игры"""
     chat_id = message.chat.id
@@ -191,7 +191,7 @@ async def cmd_game_status(message: types.Message):
                 clean_message = status_message.replace("*", "").replace("`", "").replace("\\_", "_")
                 await message.answer(clean_message)
 
-@dp.message(Command("help"))
+@dp.message(Command("help", ignore_mention=True))
 async def cmd_help(message: types.Message):
     """Обработчик команды /help - показывает правила игры и доступные команды"""
     help_text = (
