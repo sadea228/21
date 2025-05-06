@@ -818,6 +818,8 @@ async def on_shutdown(bot: Bot) -> None:
     # Закрываем внутреннюю aiohttp-сессию бота
     await bot.session.close()
     logging.info("Aiohttp session закрыта")
+    # По рекомендации context7: ждём 250 мс для корректного закрытия соединений
+    await asyncio.sleep(0.250)
 
 # Функция для запуска бота с polling (для локальной разработки)
 async def start_polling():
