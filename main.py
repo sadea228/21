@@ -810,17 +810,6 @@ async def on_startup(bot: Bot) -> None:
     
     logging.info("Команды бота установлены для разных типов чатов")
 
-async def on_shutdown(bot: Bot) -> None:
-    """Действия при выключении бота"""
-    # Удаляем вебхук
-    await bot.delete_webhook()
-    logging.info("Webhook удален")
-    # Закрываем внутреннюю aiohttp-сессию бота
-    await bot.session.close()
-    logging.info("Aiohttp session закрыта")
-    # По рекомендации context7: ждём 250 мс для корректного закрытия соединений
-    await asyncio.sleep(0.250)
-
 # Функция для запуска бота с polling (для локальной разработки)
 async def start_polling():
     """Запуск бота с использованием polling (для локальной разработки)"""
@@ -855,7 +844,16 @@ def start_webhook():
     
     # Установка обработчиков событий
     dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
+    # По рекомендации context7: добавляем cleanup контекст для удаления webhook и закрытия сессии при завершении приложения
+    async def bot_cleanup(app):
+        yield
+        await bot.delete_webhook()
+        logging.info("Webhook удален")
+        await bot.session.close()
+        logging.info("Aiohttp session закрыта")
+        # Небольшая задержка для корректного закрытия соединений
+        await asyncio.sleep(0.250)
+    app.cleanup_ctx.append(bot_cleanup)
     
     # Настройка вебхука
     webhook_requests_handler = SimpleRequestHandler(
