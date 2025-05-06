@@ -630,14 +630,14 @@ async def process_stand_callback(callback: types.CallbackQuery):
     try:
         await bot.send_message(
             game.chat_id,
-            f"✋ Игрок `{player.username}` останавливается. Сумма очков: *{player.get_score()}*",
+            f"✋ Игрок `{player.username}` останавливается.",
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
         logging.error(f"Ошибка при отправке форматированного сообщения: {e}")
         await bot.send_message(
             game.chat_id,
-            f"✋ Игрок {player.username} останавливается. Сумма очков: {player.get_score()}"
+            f"✋ Игрок {player.username} останавливается."
         )
     
     # Убираем клавиатуру после остановки
