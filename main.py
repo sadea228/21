@@ -786,75 +786,40 @@ async def unhandled_message_handler(message: types.Message):
 
 async def on_startup(bot: Bot) -> None:
     """Действия при запуске бота"""
-    # Устанавливаем вебхук
     await bot.set_webhook(url=WEBHOOK_URL)
     logging.info(f"Webhook установлен на {WEBHOOK_URL}")
-    
     # Устанавливаем команды бота для отображения в меню
-    # Команды для личных сообщений
     private_commands = [
         types.BotCommand(command="start", description="Начать диалог с ботом"),
         types.BotCommand(command="help", description="Правила игры и список команд")
     ]
-    
-    # Команды для групповых чатов
     group_commands = [
         types.BotCommand(command="start_21", description="Начать новую игру в 21"),
         types.BotCommand(command="game_status", description="Проверить статус текущей игры"),
         types.BotCommand(command="help", description="Правила игры и список команд")
     ]
-    
-    # Устанавливаем команды для разных типов чатов
     await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
     await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
-    
     logging.info("Команды бота установлены для разных типов чатов")
 
-# Функция для запуска бота с polling (для локальной разработки)
-async def start_polling():
-    """Запуск бота с использованием polling (для локальной разработки)"""
-    # Устанавливаем команды бота для отображения в меню
-    # Команды для личных сообщений
-    private_commands = [
-        types.BotCommand(command="start", description="Начать диалог с ботом"),
-        types.BotCommand(command="help", description="Правила игры и список команд")
-    ]
-    
-    # Команды для групповых чатов
-    group_commands = [
-        types.BotCommand(command="start_21", description="Начать новую игру в 21"),
-        types.BotCommand(command="game_status", description="Проверить статус текущей игры"),
-        types.BotCommand(command="help", description="Правила игры и список команд")
-    ]
-    
-    # Устанавливаем команды для разных типов чатов
-    await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
-    await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
-    
-    logging.info("Команды бота установлены для разных типов чатов")
-    
-    # Запускаем бота
-    await dp.start_polling(bot)
+async def on_shutdown(bot: Bot) -> None:
+    """Действия при выключении бота"""
+    await bot.delete_webhook()
+    logging.info("Webhook удален")
+    await bot.session.close()
+    logging.info("Aiohttp session закрыта")
+    # По рекомендации context7: небольшая задержка перед полным завершением
+    await asyncio.sleep(0.250)
 
-# Функция для настройки и запуска веб-приложения с webhook (для деплоя)
 def start_webhook():
     """Запуск бота с использованием webhook (для деплоя на Render)"""
     # Настраиваем веб-приложение
     app = web.Application()
     
-    # Установка обработчиков событий
+    # Установка обработчиков событий на старте и на завершении
     dp.startup.register(on_startup)
-    # По рекомендации context7: добавляем cleanup контекст для удаления webhook и закрытия сессии при завершении приложения
-    async def bot_cleanup(app):
-        yield
-        await bot.delete_webhook()
-        logging.info("Webhook удален")
-        await bot.session.close()
-        logging.info("Aiohttp session закрыта")
-        # Небольшая задержка для корректного закрытия соединений
-        await asyncio.sleep(0.250)
-    app.cleanup_ctx.append(bot_cleanup)
-    
+    dp.shutdown.register(on_shutdown)
+
     # Настройка вебхука
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
@@ -881,9 +846,27 @@ def start_webhook():
     # Запуск веб-сервера
     web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
 
+# Функция для запуска бота с polling (для локальной разработки)
+async def start_polling():
+    """Запуск бота с использованием polling (для локальной разработки)"""
+    # Устанавливаем команды бота для отображения в меню
+    private_commands = [
+        types.BotCommand(command="start", description="Начать диалог с ботом"),
+        types.BotCommand(command="help", description="Правила игры и список команд")
+    ]
+    # Команды для групповых чатов
+    group_commands = [
+        types.BotCommand(command="start_21", description="Начать новую игру в 21"),
+        types.BotCommand(command="game_status", description="Проверить статус текущей игры"),
+        types.BotCommand(command="help", description="Правила игры и список команд")
+    ]
+    await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
+    await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
+    logging.info("Команды бота установлены для разных типов чатов")
+    # Запускаем polling
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    # Определяем, запускаемся в режиме polling или webhook
-    # В локальной среде используем polling, на Render - webhook
     if os.environ.get('IS_RENDER') or '--webhook' in sys.argv:
         logging.info("Запуск бота в режиме webhook (для деплоя)")
         start_webhook()
