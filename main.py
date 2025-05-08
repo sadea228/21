@@ -843,8 +843,8 @@ def start_webhook():
     # Настройка веб-сервера
     setup_application(app, dp, bot=bot)
     
-    # Запуск веб-сервера
-    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
+    # Запуск веб-сервера без обработки сигналов, чтобы при SIGTERM не вызывались on_shutdown-хуки
+    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, handle_signals=False)
 
 if __name__ == "__main__":
     # Запуск бота только в режиме webhook
