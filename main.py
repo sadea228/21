@@ -846,30 +846,11 @@ def start_webhook():
     # Запуск веб-сервера
     web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
 
-# Функция для запуска бота с polling (для локальной разработки)
-async def start_polling():
-    """Запуск бота с использованием polling (для локальной разработки)"""
-    # Устанавливаем команды бота для отображения в меню
-    private_commands = [
-        types.BotCommand(command="start", description="Начать диалог с ботом"),
-        types.BotCommand(command="help", description="Правила игры и список команд")
-    ]
-    # Команды для групповых чатов
-    group_commands = [
-        types.BotCommand(command="start_21", description="Начать новую игру в 21"),
-        types.BotCommand(command="game_status", description="Проверить статус текущей игры"),
-        types.BotCommand(command="help", description="Правила игры и список команд")
-    ]
-    await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
-    await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
-    logging.info("Команды бота установлены для разных типов чатов")
-    # Запускаем polling
-    await dp.start_polling(bot)
-
 if __name__ == "__main__":
+    # Запуск бота только в режиме webhook
     if os.environ.get('IS_RENDER') or '--webhook' in sys.argv:
         logging.info("Запуск бота в режиме webhook (для деплоя)")
         start_webhook()
     else:
-        logging.info("Запуск бота в режиме polling (для локальной разработки)")
-        asyncio.run(start_polling()) 
+        logging.error("Локальный запуск отключен. Установите переменную окружения IS_RENDER или используйте --webhook для запуска.")
+        sys.exit(1) 
