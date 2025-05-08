@@ -802,24 +802,11 @@ async def on_startup(bot: Bot) -> None:
     await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
     logging.info("Команды бота установлены для разных типов чатов")
 
-async def on_shutdown(bot: Bot) -> None:
-    """Действия при выключении бота"""
-    await bot.delete_webhook()
-    logging.info("Webhook удален")
-    await bot.session.close()
-    logging.info("Aiohttp session закрыта")
-    # По рекомендации context7: небольшая задержка перед полным завершением
-    await asyncio.sleep(0.250)
-
 def start_webhook():
     """Запуск бота с использованием webhook (для деплоя на Render)"""
     # Настраиваем веб-приложение
     app = web.Application()
     
-    # Установка обработчиков событий на старте и на завершении
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-
     # Настройка вебхука
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
@@ -844,7 +831,7 @@ def start_webhook():
     setup_application(app, dp, bot=bot)
     
     # Запуск веб-сервера без обработки сигналов, чтобы при SIGTERM не вызывались on_shutdown-хуки
-    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, handle_signals=False)
+    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, handle_signals=False, shutdown_timeout=0)
 
 if __name__ == "__main__":
     # Запуск бота только в режиме webhook
