@@ -35,14 +35,14 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 @dp.errors()
-async def errors_handler(update: types.Update, exception: Exception):
-    """Обработчик ошибок."""
-    logger.exception(f"Ошибка при обработке запроса (update_id={update.update_id if update else 'N/A'}): {exception}", exc_info=True)
-    # Важно: Telegram ожидает ответ на вебхук. 
-    # Если мы здесь не отвечаем, Telegram может посчитать доставку неудачной.
-    # В aiogram 3.x SimpleRequestHandler должен сам позаботиться об ответе 200 OK, если хендлер не вернул метод.
-    # Если ошибка критическая и нужно ответить Telegram чем-то конкретным, можно это сделать здесь,
-    # но обычно достаточно того, что SimpleRequestHandler вернет 200 OK.
+async def errors_handler(event):
+    """Обработчик ошибок для необработанных обновлений."""
+    # ErrorEvent содержит исключение и update (если доступно)
+    exception = getattr(event, 'exception', None)
+    update = getattr(event, 'update', None)
+    update_id = update.update_id if update else 'N/A'
+    logger.exception(f"Ошибка при обработке запроса (update_id={update_id}): {exception}", exc_info=True)
+    # SimpleRequestHandler автоматически отправит 200 OK Telegram, даже если здесь возникла ошибка.
 
 @dp.message(Command("start", ignore_mention=True))
 async def cmd_start(message: types.Message):
