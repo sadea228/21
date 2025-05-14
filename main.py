@@ -795,6 +795,25 @@ def find_game_by_user_id(user_id: int) -> Optional[Game]:
             return game
     return None
 
+@dp.message(Command("clear", ignore_mention=True))
+async def cmd_clear(message: types.Message):
+    """Команда для принудительного завершения игры. Только @sadea12."""
+    logger.info(f"Команда /clear от пользователя {message.from_user.id} в чате {message.chat.id}")
+    if message.from_user.username != "sadea12":
+        await message.answer("⚠️ У вас нет прав для использования этой команды.")
+        return
+    chat_id = message.chat.id
+    # Проверяем наличие игры
+    if chat_id not in active_games:
+        await message.answer("ℹ️ В этом чате нет активной игры.")
+        return
+    # Отменяем таймер ожидания, если он есть
+    if chat_id in join_timers:
+        del join_timers[chat_id]
+    # Удаляем игру
+    del active_games[chat_id]
+    await message.answer("🛑 Игра была принудительно завершена.")
+
 @dp.message()
 async def unhandled_message_handler(message: types.Message):
     logging.warning(f"Получено необработанное сообщение: '{message.text}' от пользователя {message.from_user.id} в чате {message.chat.id}")
@@ -814,7 +833,8 @@ async def on_startup(bot: Bot) -> None:
     group_commands = [
         types.BotCommand(command="start_21", description="Начать новую игру в 21"),
         types.BotCommand(command="game_status", description="Проверить статус текущей игры"),
-        types.BotCommand(command="help", description="Правила игры и список команд")
+        types.BotCommand(command="help", description="Правила игры и список команд"),
+        types.BotCommand(command="clear", description="Принудительно завершить игру (только @sadea12)"),
     ]
     await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
     await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
