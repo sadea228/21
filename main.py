@@ -8,7 +8,7 @@ import time
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
 
 from config import BOT_TOKEN, WEBHOOK_PATH, WEBHOOK_URL, WEB_SERVER_HOST, WEB_SERVER_PORT
@@ -17,6 +17,9 @@ from keyboards import get_join_keyboard, get_game_actions_keyboard
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
+# Попробуем включить более подробное логирование для aiohttp.access, чтобы видеть все запросы к вебхуку
+logging.getLogger('aiohttp.access').setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__) # Используем именованный логгер для нашего кода
 
 # Словарь для хранения таймеров ожидания второго игрока
 join_timers: Dict[int, float] = {}
@@ -32,13 +35,19 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 @dp.errors()
-async def errors_handler(exception: Exception):
+async def errors_handler(update: types.Update, exception: Exception):
     """Обработчик ошибок."""
-    logging.exception(f"Ошибка при обработке запроса: {exception}")
+    logger.exception(f"Ошибка при обработке запроса (update_id={update.update_id if update else 'N/A'}): {exception}", exc_info=True)
+    # Важно: Telegram ожидает ответ на вебхук. 
+    # Если мы здесь не отвечаем, Telegram может посчитать доставку неудачной.
+    # В aiogram 3.x SimpleRequestHandler должен сам позаботиться об ответе 200 OK, если хендлер не вернул метод.
+    # Если ошибка критическая и нужно ответить Telegram чем-то конкретным, можно это сделать здесь,
+    # но обычно достаточно того, что SimpleRequestHandler вернет 200 OK.
 
 @dp.message(Command("start", ignore_mention=True))
 async def cmd_start(message: types.Message):
     """Обработчик команды /start"""
+    logger.info(f"Команда /start от пользователя {message.from_user.id} в чате {message.chat.id}")
     await message.answer(
         "🎴 *Добро пожаловать в игру \"21\"!*\n\n"
         "Чтобы начать игру в групповом чате, используйте команду /start_21.\n"
@@ -51,8 +60,10 @@ async def cmd_start(message: types.Message):
 @dp.message(Command("start_21", ignore_mention=True))
 async def cmd_start_game(message: types.Message):
     """Обработчик команды /start_21 - начало новой игры"""
+    logger.info(f"Команда /start_21 от пользователя {message.from_user.id} в чате {message.chat.id}")
     # Проверяем, что команда отправлена в групповом чате
     if message.chat.type not in ["group", "supergroup"]:
+        logger.warning(f"/start_21 вызвана не в группе пользователем {message.from_user.id}")
         await message.answer("⚠️ Эта команда работает только в групповых чатах!")
         return
 
@@ -93,10 +104,12 @@ async def cmd_start_game(message: types.Message):
 @dp.message(Command("game_status", ignore_mention=True))
 async def cmd_game_status(message: types.Message):
     """Обработчик команды /game_status - показывает текущий статус игры"""
+    logger.info(f"Команда /game_status от пользователя {message.from_user.id} в чате {message.chat.id}")
     chat_id = message.chat.id
     
     # Проверяем, что команда отправлена в групповом чате
     if message.chat.type not in ["group", "supergroup"]:
+        logger.warning(f"/game_status вызвана не в группе пользователем {message.from_user.id}")
         await message.answer("⚠️ Эта команда работает только в групповых чатах!")
         return
     
@@ -194,6 +207,7 @@ async def cmd_game_status(message: types.Message):
 @dp.message(Command("help", ignore_mention=True))
 async def cmd_help(message: types.Message):
     """Обработчик команды /help - показывает правила игры и доступные команды"""
+    logger.info(f"Команда /help от пользователя {message.from_user.id} в чате {message.chat.id}")
     help_text = (
         "🎮 *Правила игры \"21\"*\n\n"
         "Цель игры: набрать 21 очко или количество очков, максимально близкое к 21, но не больше.\n\n"
@@ -262,6 +276,7 @@ async def wait_for_second_player(chat_id: int, message_id: int):
 @dp.callback_query(F.data == "join_game")
 async def process_join_callback(callback: types.CallbackQuery):
     """Обработчик нажатия на кнопку присоединения к игре"""
+    logger.info(f"Колбэк 'join_game' от пользователя {callback.from_user.id} в чате {callback.message.chat.id if callback.message else 'N/A'}")
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     username = callback.from_user.first_name
@@ -415,6 +430,7 @@ async def send_cards_info_to_players(game: Game):
 @dp.callback_query(F.data == "hit")
 async def process_hit_callback(callback: types.CallbackQuery):
     """Обработчик нажатия на кнопку 'Взять ещё'"""
+    logger.info(f"Колбэк 'hit' от пользователя {callback.from_user.id} в ЛС (сообщение {callback.message.message_id if callback.message else 'N/A'})")
     user_id = callback.from_user.id
     
     # Проверяем, является ли это сообщение последним с клавиатурой
@@ -603,6 +619,7 @@ async def process_hit_callback(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "stand")
 async def process_stand_callback(callback: types.CallbackQuery):
     """Обработчик нажатия на кнопку 'Остановиться'"""
+    logger.info(f"Колбэк 'stand' от пользователя {callback.from_user.id} в ЛС (сообщение {callback.message.message_id if callback.message else 'N/A'})")
     user_id = callback.from_user.id
     
     # Проверяем, является ли это сообщение последним с клавиатурой
@@ -780,14 +797,15 @@ def find_game_by_user_id(user_id: int) -> Optional[Game]:
 
 @dp.message()
 async def unhandled_message_handler(message: types.Message):
-    logging.warning(f"Получено необработанное сообщение: {message.text} от пользователя {message.from_user.id} в чате {message.chat.id}")
+    logging.warning(f"Получено необработанное сообщение: '{message.text}' от пользователя {message.from_user.id} в чате {message.chat.id}")
     # Можно добавить ответ пользователю для отладки, но пока ограничимся логом
     # await message.answer("Получил ваше сообщение, но не нашел обработчик команды.")
 
 async def on_startup(bot: Bot) -> None:
     """Действия при запуске бота"""
+    logger.info("Выполняется on_startup...")
     await bot.set_webhook(url=WEBHOOK_URL)
-    logging.info(f"Webhook установлен на {WEBHOOK_URL}")
+    logger.info(f"Webhook установлен на {WEBHOOK_URL}")
     # Устанавливаем команды бота для отображения в меню
     private_commands = [
         types.BotCommand(command="start", description="Начать диалог с ботом"),
@@ -800,10 +818,17 @@ async def on_startup(bot: Bot) -> None:
     ]
     await bot.set_my_commands(private_commands, scope=types.BotCommandScopeDefault())
     await bot.set_my_commands(group_commands, scope=types.BotCommandScopeAllGroupChats())
-    logging.info("Команды бота установлены для разных типов чатов")
+    logger.info("Команды бота установлены для разных типов чатов")
 
 def start_webhook():
     """Запуск бота с использованием webhook (для деплоя на Render)"""
+    # Сначала устанавливаем webhook и команды через on_startup
+    logger.info("Вызов on_startup(bot) для установки webhook и команд")
+    import asyncio
+    try:
+        asyncio.run(on_startup(bot))
+    except Exception as e:
+        logger.error(f"Ошибка при выполнении on_startup: {e}", exc_info=True)
     # Настраиваем веб-приложение
     app = web.Application()
     
@@ -811,33 +836,60 @@ def start_webhook():
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
+        # Сюда можно передать пользовательские аргументы, если нужно, они будут доступны в хэндлерах
+        # например: handle_unknown_updates=True (хотя по умолчанию True)
     )
     webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+    logger.info(f"SimpleRequestHandler зарегистрирован для пути {WEBHOOK_PATH}")
     
     # Добавляем обработчик корневого маршрута для healthcheck
     async def health_check(request):
-        return web.Response(text=f"Бот работает. Webhook установлен на {WEBHOOK_URL}")
+        # Логируем health check запросы, чтобы видеть, что Render их делает
+        logger.debug(f"Health check запрос от {request.remote} к {request.path}")
+        return web.Response(text=f"Бот работает. Aiogram Webhook (SimpleRequestHandler) активен. Путь: {WEBHOOK_URL}")
     
     app.router.add_get("/", health_check)
+    logger.info(f"Health check зарегистрирован для пути /")
     
     # Диагностическая информация
-    logging.info(f"Используется BOT_TOKEN (маскировано): ...{BOT_TOKEN[-5:]}")
-    logging.info(f"Webhook URL: {WEBHOOK_URL}")
-    logging.info(f"Webhook PATH: {WEBHOOK_PATH}")
-    logging.info(f"Полный путь Webhook: {WEBHOOK_URL}")
-    logging.info(f"Веб-сервер запускается на {WEB_SERVER_HOST}:{WEB_SERVER_PORT}")
+    logger.info(f"Используется BOT_TOKEN (маскировано): ...{BOT_TOKEN[-5:]}")
+    logger.info(f"Webhook URL (из config): {WEBHOOK_URL}")
+    logger.info(f"Webhook PATH (из config): {WEBHOOK_PATH}")
+    # logger.info(f"Полный путь Webhook: {WEBHOOK_URL}") # Это дублирует предыдущую строку
+    logger.info(f"Веб-сервер запускается на {WEB_SERVER_HOST}:{WEB_SERVER_PORT}")
     
-    # Настройка веб-сервера
-    setup_application(app, dp, bot=bot)
+    # Настройка веб-сервера aiogram (если используется setup_application)
+    # setup_application(app, dp, bot=bot) # Закомментировано, так как используем SimpleRequestHandler.register выше
+    # logger.info("setup_application(app, dp, bot=bot) выполнен (если раскомментировано)")
     
     # Запуск веб-сервера без обработки сигналов, чтобы при SIGTERM не вызывались on_shutdown-хуки
-    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, handle_signals=False, shutdown_timeout=0)
+    # Это специфичная настройка, если вы уверены, что она нужна.
+    # Для более "чистого" завершения aiogram бота, обычно handle_signals=True (по умолчанию).
+    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, handle_signals=False, shutdown_timeout=0, access_log=None) 
+    # access_log=None, чтобы не дублировать логи с logging.getLogger('aiohttp.access').setLevel(logging.DEBUG)
+    # если хотите стандартный формат логов aiohttp, уберите access_log=None и .setLevel(logging.DEBUG) выше
 
 if __name__ == "__main__":
     # Запуск бота только в режиме webhook
+    # Добавим лог перед проверкой условий
+    logger.info(f"Запуск __main__. IS_RENDER: {os.environ.get('IS_RENDER')}, sys.argv: {sys.argv}")
     if os.environ.get('IS_RENDER') or '--webhook' in sys.argv:
-        logging.info("Запуск бота в режиме webhook (для деплоя)")
-        start_webhook()
+        logger.info("Запуск бота в режиме webhook (для деплоя)")
+        # Вызов on_startup теперь происходит внутри start_webhook, если это необходимо для aiogram 3.x стиля
+        # dp.startup.register(on_startup) # Если on_startup должен вызываться при старте Dispatcher
+        # Однако, set_webhook обычно вызывается один раз при запуске приложения.
+        # В aiogram 3.x on_startup часто используется для регистрации в dp.startup.
+        # Но так как у вас start_webhook() и есть on_startup(bot), который вы могли бы вызвать перед web.run_app,
+        # давайте убедимся, что set_webhook вызывается.
+        # Мы уже вызываем on_startup внутри dp.startup.register(on_startup) или напрямую.
+        # В вашем случае on_startup() устанавливает вебхук и команды.
+        # Это должно быть сделано до того, как веб-сервер начнет принимать запросы.
+        # Самый простой способ - вызвать его перед run_app, но убедившись, что bot и dp инициализированы.
+        
+        # Переносим вызов on_startup внутрь start_webhook перед запуском app
+        # dp.startup.register(on_startup) # Если хотите, чтобы on_startup вызывался при старте диспетчера
+        
+        start_webhook() # Внутри этой функции теперь должен быть вызов on_startup
     else:
-        logging.error("Локальный запуск отключен. Установите переменную окружения IS_RENDER или используйте --webhook для запуска.")
+        logger.error("Локальный запуск не разрешен текущей конфигурацией. Установите IS_RENDER или используйте --webhook.")
         sys.exit(1) 
