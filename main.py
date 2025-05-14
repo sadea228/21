@@ -822,17 +822,18 @@ async def on_startup(bot: Bot) -> None:
 
 def start_webhook():
     """Запуск бота с использованием webhook (для деплоя на Render)"""
-    # Сначала устанавливаем webhook и команды через on_startup
-    logger.info("Вызов on_startup(bot) для установки webhook и команд")
-    import asyncio
-    try:
-        asyncio.run(on_startup(bot))
-    except Exception as e:
-        logger.error(f"Ошибка при выполнении on_startup: {e}", exc_info=True)
     # Настраиваем веб-приложение
     app = web.Application()
+    # Регистрируем on_startup хук aiohttp, чтобы установить webhook и команды в одной event loop
+    async def _on_app_startup(app):
+        logger.info("Запуск on_startup(bot) через app.on_startup")
+        try:
+            await on_startup(bot)
+        except Exception as e:
+            logger.error(f"Ошибка при выполнении on_startup: {e}", exc_info=True)
+    app.on_startup.append(_on_app_startup)
     
-    # Настройка вебхука
+    # Настройка вебхука и регистрация обработчика обновлений
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
